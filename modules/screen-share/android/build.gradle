@@ -1,0 +1,63 @@
+apply plugin: 'com.android.library'
+
+group = 'expo.modules.screenshare'
+version = '0.7.6'
+
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useExpoPublishing()
+
+// If you want to use the managed Android SDK versions from expo-modules-core, set this to true.
+// The Android SDK versions will be bumped from time to time in SDK releases and may introduce breaking changes in your module code.
+// Most of the time, you may like to manage the Android SDK versions yourself.
+def useManagedAndroidSdkVersions = false
+if (useManagedAndroidSdkVersions) {
+  useDefaultAndroidSdkVersions()
+} else {
+  buildscript {
+    // Simple helper that allows the root project to override versions declared by this library.
+    ext.safeExtGet = { prop, fallback ->
+      rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+    }
+  }
+  project.android {
+    compileSdkVersion safeExtGet("compileSdkVersion", 36)
+    defaultConfig {
+      minSdkVersion safeExtGet("minSdkVersion", 26)
+      targetSdkVersion safeExtGet("targetSdkVersion", 36)
+    }
+  }
+}
+
+android {
+  namespace "expo.modules.screenshare"
+  defaultConfig {
+    versionCode 1
+    versionName "0.7.6"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Expo's required core
+  implementation project(':expo-modules-core')
+
+  // 1. Ktor 3.3.3 (Modern Embedded Server & WebSockets)
+  def ktor_version = "3.3.3"
+  implementation "io.ktor:ktor-server-netty:$ktor_version"
+  implementation "io.ktor:ktor-server-websockets:$ktor_version"
+  implementation "io.ktor:ktor-server-content-negotiation:$ktor_version"
+
+  // 2. Google WebRTC (Latest official stable)
+  // 1.0.+ is the standard way to pull the latest "tip-of-tree" build
+  implementation 'io.github.webrtc-sdk:android:137.7151.05'
+
+  // 3. Kotlin Coroutines (Version 1.10.2 is the latest for Dec 2025)
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
+
+  implementation "io.ktor:ktor-server-html-builder:3.0.3"
+}

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Screen Receiver</title>
+    <style>
+        body { 
+            background: #0f0f0f; 
+            color: #e0e0e0; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+        #container {
+            width: 90%;
+            max-width: 1100px;
+            text-align: center;
+        }
+        video { 
+            width: 100%; 
+            max-height: 80vh;
+            border: 2px solid #333; 
+            border-radius: 12px; 
+            background: #000; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .status-box {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #222;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #00ff00;
+            border: 1px solid #444;
+        }
+        #log {
+            margin-top: 10px;
+            font-size: 0.75rem;
+            color: #888;
+            max-height: 50px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <video id="remoteVideo" autoplay playsinline controls></video>
+        <div class="status-box">
+            Status: <span id="status">Connecting to WebSocket...</span>
+        </div>
+        <div id="log"></div>
+    </div>
+
+    <script type="module">
+        import { webSocketAddress } from './address.js';
+
+        const video = document.getElementById('remoteVideo');
+        const statusText = document.getElementById('status');
+        const logBox = document.getElementById('log');
+
+        function log(msg) {
+            console.log(msg);
+            const entry = document.createElement('div');
+            entry.innerText = `> ${msg}`;
+            logBox.prepend(entry);
+        }
+
+        // 1. Initialize PeerConnection
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        // 2. Handle incoming stream
+        pc.ontrack = (event) => {
+            log("Media Track Received!");
+            if (video.srcObject !== event.streams[0]) {
+                video.srcObject = event.streams[0];
+                statusText.innerText = "STREAMING LIVE";
+                statusText.style.color = "#00ff00";
+            }
+        };
+
+        // 3. Handle Local ICE Candidates (Send to Phone)
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                log("Local ICE Candidate found");
+                socket.send(JSON.stringify({
+                    type: 'candidate',
+                    candidate: event.candidate.candidate,
+                    sdpMid: event.candidate.sdpMid,
+                    sdpMLineIndex: event.candidate.sdpMLineIndex
+                }));
+            }
+        };
+
+        pc.onconnectionstatechange = () => {
+            log(`Connection state: ${pc.connectionState}`);
+            if (pc.connectionState === 'failed') {
+                statusText.innerText = "Connection Failed. Refresh.";
+                statusText.style.color = "#ff4444";
+            }
+        };
+
+        // 4. Signaling via WebSocket
+        const socket = new WebSocket(webSocketAddress);
+
+        socket.onopen = () => {
+            log("WebSocket connected");
+            statusText.innerText = "Waiting for Phone Offer...";
+        };
+
+        socket.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
+
+            // Handle SDP Offer from Phone
+            if (data.type === 'offer') {
+                log("Received SDP Offer from Phone");
+                statusText.innerText = "Handshaking (SDP Offer)...";
+                
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: 'offer',
+                    sdp: data.sdp
+                }));
+
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                socket.send(JSON.stringify({
+                    type: 'answer',
+                    sdp: answer.sdp
+                }));
+                log("Sent SDP Answer to Phone");
+            } 
+            
+            // Handle ICE Candidates from Phone
+            else if (data.type === 'candidate') {
+                log("Received Remote ICE Candidate");
+                try {
+                    await pc.addIceCandidate(new RTCIceCandidate({
+                        candidate: data.candidate,
+                        sdpMid: data.sdpMid,
+                        sdpMLineIndex: data.sdpMLineIndex
+                    }));
+                } catch (e) {
+                    log("Error adding ICE: " + e.name);
+                }
+            }
+        };
+
+        socket.onclose = () => {
+            log("WebSocket disconnected");
+            statusText.innerText = "OFFLINE";
+            statusText.style.color = "#ff4444";
+        };
+    </script>
+</body>
+</html>

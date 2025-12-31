@@ -1,0 +1,27 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:1:1-9:12
+INJECTED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:1:1-9:12
+	package
+		ADDED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:2:3-37
+		INJECTED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:1:11-69
+uses-permission#android.permission.ACCESS_NETWORK_STATE
+ADDED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:4:3-77
+	android:name
+		ADDED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:4:20-74
+uses-permission#android.permission.INTERNET
+ADDED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:5:3-65
+	android:name
+		ADDED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:5:20-62
+application
+ADDED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml:7:3-8:19
+uses-sdk
+INJECTED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml
+INJECTED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/mukesh/Desktop/Groupie/modules/screen-share/android/src/main/AndroidManifest.xml
