@@ -39,3 +39,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# The build directory of the native module
+
+modules/screen-share/android/build

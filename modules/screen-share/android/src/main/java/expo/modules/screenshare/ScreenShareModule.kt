@@ -8,9 +8,10 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.net.InetAddress
 import java.net.NetworkInterface
-import java.util.Collections
 
 class ScreenShareModule : Module() {
+  private var pendingIp: String? = null
+
   override fun definition() = ModuleDefinition {
     Name("ScreenShare")
 
@@ -18,61 +19,50 @@ class ScreenShareModule : Module() {
       val service = ScreenShareService.instance
       val activity = appContext.currentActivity ?: throw Exception("Activity not found")
       
-      if (service != null) {
-          val ip = getLocalIpAddress() ?: "localhost"
-          
-          // Initialize the MediaProjectionManager to request screen capture
-          val manager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-          val permissionIntent = manager.createScreenCaptureIntent()
-          
-          // Launch the system dialog for screen capture permission
-          activity.startActivityForResult(permissionIntent, 1001)
-          
-          // Start the Ktor server to serve the HTML and handle signaling
-          service.startServer(ip)
-          
-          return@AsyncFunction "http://$ip:8080"
-      } else {
+      if (service == null) {
           throw Exception("ACCESSIBILITY_SERVICE_NOT_ENABLED")
       }
+
+      // 1. Get the IP address first
+      val ip = getLocalIpAddress() ?: throw Exception("COULD_NOT_GET_IP_ADDRESS")
+      pendingIp = ip // Store it temporarily to use after permission is granted
+
+      // 2. Prepare the MediaProjection request
+      val manager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+      val permissionIntent = manager.createScreenCaptureIntent()
+      
+      // 3. Launch the native permission dialog
+      activity.startActivityForResult(permissionIntent, 1001)
+      
+      // Return the URL to the frontend so it can display a QR code or link
+      return@AsyncFunction "http://$ip:8080"
     }
 
-    // This listener catches the result of the screen capture permission dialog
     OnActivityResult { _, payload ->
       if (payload.requestCode == 1001) {
           if (payload.resultCode == Activity.RESULT_OK) {
-              val data: Intent? = payload.data
-              if (data != null) {
-                  // Pass the intent data to the service to initiate Foreground mode and WebRTC
-                  ScreenShareService.instance?.onScreenCapturePermissionGranted(data)
+              val data = payload.data
+              val ip = pendingIp
+              
+              if (data != null && ip != null) {
+                  // SUCCESS: Start hardware AND server now
+                  ScreenShareService.instance?.onScreenCapturePermissionGranted(data, ip)
               }
           } else {
-              // Handle case where user denied permission
-              System.err.println("Screen share permission denied by user.")
+              // User denied permission
+              pendingIp = null
           }
       }
     }
   }
 
-  /**
-   * Helper function to find the device's local IPv4 address on the Wi-Fi network.
-   */
   private fun getLocalIpAddress(): String? {
-    try {
-      val interfaces = Collections.list(NetworkInterface.getNetworkInterfaces())
-      for (intf in interfaces) {
-        val addrs = Collections.list(intf.inetAddresses)
-        for (addr in addrs) {
-          if (!addr.isLoopbackAddress && addr is InetAddress) {
-            val sAddr = addr.hostAddress
-            val isIPv4 = sAddr.indexOf(':') < 0
-            if (isIPv4) return sAddr
-          }
-        }
-      }
-    } catch (ex: Exception) {
-      ex.printStackTrace()
-    }
-    return null
+    return try {
+      NetworkInterface.getNetworkInterfaces().toList()
+        .flatMap { it.inetAddresses.toList() }
+        .filter { !it.isLoopbackAddress && it.hostAddress.indexOf(':') < 0 }
+        .map { it.hostAddress }
+        .firstOrNull()
+    } catch (e: Exception) { null }
   }
 }
