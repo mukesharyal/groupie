@@ -8,10 +8,6 @@
     "scheme": "groupie",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Groupie"
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -49,11 +45,20 @@
             "minSdkVersion": 26
           }
         }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "commandColor": "#00000000"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.anonymous.Groupie"
     }
   }
 }

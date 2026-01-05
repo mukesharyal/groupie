@@ -7,9 +7,17 @@ import android.util.Log
 import org.json.JSONObject
 import org.webrtc.*
 
+/**
+ * Interface to communicate received gestures to the Accessibility Service
+ */
+interface PointerListener {
+    fun onPointerEventReceived(message: String)
+}
+
 class WebRTCManager(
     context: Context,
     private val rootEglBase: EglBase,
+    private val pointerListener: PointerListener, // Injected listener
     private val onConnectionEstablished: () -> Unit,
     private val onConnectionLost: () -> Unit,
     private val onSignalReady: (String) -> Unit
@@ -18,7 +26,6 @@ class WebRTCManager(
     private var factory: PeerConnectionFactory
     private var peerConnection: PeerConnection? = null
     
-    // Track the data channel
     private var dataChannel: DataChannel? = null
 
     init {
@@ -69,9 +76,11 @@ class WebRTCManager(
                 }
             }
 
-            // Data channel received from remote (not used here as we create it locally)
             override fun onDataChannel(dc: DataChannel?) {
+                // If the remote side creates a data channel, we attach hooks to it
                 Log.d("WebRTC", "Remote DataChannel received")
+                dataChannel = dc
+                setupDataChannelHooks()
             }
 
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {}
@@ -85,10 +94,9 @@ class WebRTCManager(
             override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {}
         })
 
-        // --- DATA CHANNEL SETUP ---
-        // Create the data channel BEFORE creating the offer
+        // --- DATA CHANNEL SETUP (Local Creation) ---
         val dcInit = DataChannel.Init().apply {
-            ordered = true // Ensure messages arrive in order
+            ordered = true 
         }
         dataChannel = peerConnection?.createDataChannel("messagingChannel", dcInit)
         setupDataChannelHooks()
@@ -110,28 +118,25 @@ class WebRTCManager(
     private fun setupDataChannelHooks() {
         dataChannel?.registerObserver(object : DataChannel.Observer {
             override fun onBufferedAmountChange(p0: Long) {}
+            
             override fun onStateChange() {
                 Log.d("WebRTC", "DataChannel State: ${dataChannel?.state()}")
             }
+
             override fun onMessage(buffer: DataChannel.Buffer) {
+                // Extract the bytes from the WebRTC Buffer
                 val data = buffer.data
                 val bytes = ByteArray(data.remaining())
                 data.get(bytes)
                 val message = String(bytes)
-                Log.d("WebRTC", "Received via DataChannel: $message")
+
+                // Pass the raw JSON string to the PointerListener on the Main Thread
+                // This is safer because dispatchGesture usually requires the Main/UI thread.
+                mainHandler.post {
+                    pointerListener.onPointerEventReceived(message)
+                }
             }
         })
-    }
-
-    /**
-     * Helper to send data to the browser
-     */
-    fun sendMessage(text: String) {
-        val buffer = DataChannel.Buffer(
-            java.nio.ByteBuffer.wrap(text.toByteArray()),
-            false // text, not binary
-        )
-        dataChannel?.send(buffer)
     }
 
     fun handleRemoteSignal(message: String) {

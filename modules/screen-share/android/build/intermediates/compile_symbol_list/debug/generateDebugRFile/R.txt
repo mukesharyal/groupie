@@ -1,2 +1,0 @@
-int string service_description 0x0
-int xml screen_share_config 0x0

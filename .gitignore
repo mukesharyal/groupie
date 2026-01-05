@@ -1,6 +1,8 @@
 # dependencies
 node_modules/
 
+.vscode/
+
 # Expo
 .expo/
 dist/
@@ -41,5 +43,7 @@ app-example
 /android
 
 # The build directory of the native module
-
 modules/screen-share/android/build
+
+modules/screen-share/ios
+
