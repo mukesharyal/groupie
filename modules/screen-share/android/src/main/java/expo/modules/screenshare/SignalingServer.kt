@@ -33,14 +33,18 @@ class SignalingServer(
             }
             
             routing {
-                get("/address.js") {
-                    val script = "export const webSocketAddress = 'ws://$ip:8080/signal';"
-                    call.respondText(script, ContentType.Application.JavaScript)
-                }
-
                 get("/") {
-                    call.respondText(htmlContent, ContentType.Text.Html)
-                }
+            // Your dynamic IP logic
+            val ip = "192.168.1.3" 
+            
+            // Perform the replacement in memory (takes microseconds)
+            val dynamicHtml = htmlTemplate.replace(
+                "WS_URL_PLACEHOLDER", 
+                "ws://$ip:8080/signal"
+            )
+            
+            call.respondText(dynamicHtml, ContentType.Text.Html)
+        }
 
                 webSocket("/signal") {
                     sessions.add(this)

@@ -2,7 +2,7 @@ import { openAccessibilitySettings } from "@/modules/screen-share";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useTheme } from "../constants/colors"; // Adjust path as needed
+import { useTheme } from "../constants/colors";
 
 import * as Updates from 'expo-updates';
 
@@ -19,10 +19,7 @@ export default function WelcomeScreen() {
         <View style={[styles.iconCircle, { backgroundColor: theme.card }]}>
           <MaterialCommunityIcons name="shield-check" size={60} color={theme.tint} />
         </View>
-        <Text style={[styles.title, { color: theme.text }]}>Permissions Required</Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Secure remote control setup
-        </Text>
+        <Text style={[styles.title, { color: theme.text }]}>Permission Required</Text>
       </View>
 
       {/* Feature List Card */}
@@ -31,26 +28,16 @@ export default function WelcomeScreen() {
           theme={theme}
           icon="gesture-tap" 
           title="Gesture Control" 
-          desc="Tap, swipe, and scroll your device from your computer." 
-        />
-        <View style={[styles.divider, { backgroundColor: theme.separator }]} />
-        <FeatureItem 
-          theme={theme}
-          icon="monitor-screenshot" 
-          title="Screen Mirroring" 
-          desc="View your device screen in real-time on your browser." 
+          desc="Tap, swipe, and scroll your device from another device." 
         />
       </View>
 
       {/* Disclosure Box */}
       <View style={styles.disclosureSection}>
-        <Text style={[styles.disclosureHeader, { color: theme.textSecondary }]}>
-          PROMINENT DISCLOSURE
-        </Text>
         <Text style={[styles.disclosureText, { color: theme.text }]}>
           This app uses Android's <Text style={styles.bold}>Accessibility Service</Text>. 
-          It is essential for <Text style={styles.bold}>simulating touch inputs</Text> and streaming your screen. 
-          We do <Text style={styles.bold}>not</Text> collect or share any personal data.
+          It is essential for <Text style={styles.bold}>simulating touch inputs</Text>.
+          We do <Text style={styles.bold}>not</Text> collect or share any data.
         </Text>
       </View>
 
