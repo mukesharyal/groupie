@@ -26,7 +26,6 @@ class ScreenShareService : AccessibilityService(), PointerListener {
     private var signalingServer: SignalingServer? = null
     private var videoTrack: VideoTrack? = null
 
-    // --- Simple State Management ---
     private var isCurrentlySharing = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -54,9 +53,6 @@ class ScreenShareService : AccessibilityService(), PointerListener {
         const val ACTION_STOP_SERVICE = "expo.modules.screenshare.STOP_SERVICE"
     }
 
-    /**
-     * Used by the Module to determine the current state.
-     */
     fun isSharingActive(): Boolean {
         return isCurrentlySharing
     }
@@ -78,13 +74,8 @@ class ScreenShareService : AccessibilityService(), PointerListener {
         instance = this
     }
 
-    // --- Screen Capture Logic ---
-
     fun onScreenCapturePermissionGranted(data: Intent, ip: String) {
-        // Prevent infinite loops: if we are already sharing, exit immediately
         if (isCurrentlySharing) return
-        
-        // Toggle the simple boolean first
         isCurrentlySharing = true
         
         startServiceForeground()
@@ -107,7 +98,10 @@ class ScreenShareService : AccessibilityService(), PointerListener {
         )
 
         val videoSource = rtcManager?.createVideoSource(true) ?: return
-        videoTrack = rtcManager?.createVideoTrack("SCREEN_VIDEO_TRACK", videoSource)
+        val track = rtcManager?.createVideoTrack("SCREEN_VIDEO_TRACK", videoSource) ?: return
+        videoTrack = track
+
+        // Now passing the videoTrack to CaptureManager as required by its new constructor
         captureManager = CaptureManager(this, rootEglBase, videoSource)
         captureManager?.startCapture(data)
         startServer(ip)
@@ -128,10 +122,7 @@ class ScreenShareService : AccessibilityService(), PointerListener {
     }
 
     internal fun stopCaptureSession() {
-        // Only run if we are actually sharing
         if (!isCurrentlySharing) return
-        
-        // Toggle immediately
         isCurrentlySharing = false
 
         captureManager?.stopCapture()
@@ -143,13 +134,9 @@ class ScreenShareService : AccessibilityService(), PointerListener {
         rtcManager = null
         videoTrack = null
         
-        // Notify JavaScript via Module broadcast
         sendBroadcast(Intent("EXPO_SCREENSHARE_STOPPED"))
-        
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
-
-    // --- Notification & Lifecycle ---
 
     private fun startServiceForeground() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -161,13 +148,9 @@ class ScreenShareService : AccessibilityService(), PointerListener {
     }
 
     private fun updateNotificationStatus(text: String) {
-        val stopIntent = Intent(ACTION_STOP_SERVICE).apply {
-            `package` = packageName
-        }
+        val stopIntent = Intent(ACTION_STOP_SERVICE).apply { `package` = packageName }
         val stopPendingIntent = PendingIntent.getBroadcast(
-            this, 
-            0, 
-            stopIntent, 
+            this, 0, stopIntent, 
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -181,18 +164,33 @@ class ScreenShareService : AccessibilityService(), PointerListener {
                 .build()
         } else {
             @Suppress("DEPRECATION")
-            Notification.Builder(this)
-                .setContentTitle(text)
-                .setOngoing(true)
-                .build()
+            Notification.Builder(this).setContentTitle(text).setOngoing(true).build()
         }
         startForeground(NOTIFICATION_ID, builder)
     }
 
+    /**
+     * Handles incoming data from the WebRTC DataChannel.
+     */
     override fun onPointerEventReceived(message: String) {
         try {
             val json = JSONObject(message)
             val type = json.getString("type")
+
+            // 1. Check for the Play/Pause toggle convention from App.svelte
+            if (type == "liveChange") {
+                val shouldPlay = json.getBoolean("value")
+                if (shouldPlay) {
+                    captureManager?.continueCapture()
+                    updateNotificationStatus("Screen Sharing Active")
+                } else {
+                    captureManager?.pauseCapture()
+                    updateNotificationStatus("Screen Sharing Paused")
+                }
+                return // Exit early as this isn't a gesture
+            }
+
+            // 2. Handle standard gesture events (down, move, up)
             val normX = json.getDouble("x").toFloat()
             val normY = json.getDouble("y").toFloat()
             val pointerId = json.getInt("id")
@@ -203,7 +201,7 @@ class ScreenShareService : AccessibilityService(), PointerListener {
 
             handleGestureLogic(type, x, y, pointerId)
         } catch (e: Exception) {
-            Log.e("ScreenShareService", "Error parsing pointer data: ${e.message}")
+            Log.e("ScreenShareService", "Error parsing incoming data: ${e.message}")
         }
     }
 

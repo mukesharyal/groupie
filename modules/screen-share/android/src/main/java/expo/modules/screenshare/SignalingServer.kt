@@ -34,15 +34,13 @@ class SignalingServer(
             
             routing {
                 get("/") {
-            // Your dynamic IP logic
-            val ip = "192.168.1.3" 
-            
-            // Perform the replacement in memory (takes microseconds)
-            val dynamicHtml = htmlTemplate.replace(
+            // 2. Perform the replacement on it
+            val dynamicHtml = htmlContent.replace(
                 "WS_URL_PLACEHOLDER", 
                 "ws://$ip:8080/signal"
             )
             
+            // 3. Send the modified version (dynamicHtml) instead of the original
             call.respondText(dynamicHtml, ContentType.Text.Html)
         }
 

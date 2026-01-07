@@ -13,55 +13,67 @@ class CaptureManager(
 ) {
     private var screenCapturer: ScreenCapturerAndroid? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
+    
+    // Flag to control frame flow
+    private var isPaused = false
+
+    /**
+     * A proxy observer that intercepts frames before they reach the video source.
+     */
+    private val proxyObserver = object : CapturerObserver {
+        override fun onCapturerStarted(success: Boolean) {
+            videoSource.capturerObserver.onCapturerStarted(success)
+        }
+
+        override fun onCapturerStopped() {
+            videoSource.capturerObserver.onCapturerStopped()
+        }
+
+        override fun onFrameCaptured(frame: VideoFrame) {
+            // If paused, we simply drop the frame and don't pass it to the source.
+            // This causes the remote peer to stay on the last successfully processed frame.
+            if (!isPaused) {
+                videoSource.capturerObserver.onFrameCaptured(frame)
+            }
+        }
+    }
 
     fun startCapture(data: Intent) {
         if (screenCapturer != null) return
 
-        // 1. Create the SurfaceTextureHelper on a dedicated thread with shared EGL context
         surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", rootEglBase.eglBaseContext)
-
-        // 2. Create the ScreenCapturer
-        screenCapturer = ScreenCapturerAndroid(data, object : MediaProjection.Callback() {
-            override fun onStop() {
-                Log.d("CaptureManager", "MediaProjection stopped by system or user.")
-            }
-        })
+        screenCapturer = ScreenCapturerAndroid(data, object : MediaProjection.Callback() {})
 
         try {
-            // 3. Initialize with the observer from our VideoSource
-            screenCapturer?.initialize(
-                surfaceTextureHelper,
-                context,
-                videoSource.capturerObserver
-            )
+            // Initialize with our proxy instead of the direct videoSource.capturerObserver
+            screenCapturer?.initialize(surfaceTextureHelper, context, proxyObserver)
 
-            // 4. Start capturing at the device's current resolution
             val metrics = context.resources.displayMetrics
-            val width = metrics.widthPixels
-            val height = metrics.heightPixels
-            
-            screenCapturer?.startCapture(width, height, 30)
-            
-            Log.d("CaptureManager", "Screen capture started: ${width}x${height}")
+            screenCapturer?.startCapture(metrics.widthPixels, metrics.heightPixels, 30)
+            isPaused = false
         } catch (e: Exception) {
             Log.e("CaptureManager", "Failed to start capture: ${e.localizedMessage}")
-            stopCapture() 
+            stopCapture()
         }
     }
 
-    /**
-     * Stops the capture and releases hardware resources.
-     */
+    fun pauseCapture() {
+        isPaused = true
+        Log.d("CaptureManager", "Capture gated: Frames are being dropped (Freeze frame).")
+    }
+
+    fun continueCapture() {
+        isPaused = false
+        Log.d("CaptureManager", "Capture ungated: Frames are flowing.")
+    }
+
     fun stopCapture() {
         try {
             screenCapturer?.stopCapture()
             screenCapturer?.dispose()
             screenCapturer = null
-
             surfaceTextureHelper?.dispose()
             surfaceTextureHelper = null
-            
-            Log.d("CaptureManager", "Capture resources released.")
         } catch (e: Exception) {
             Log.e("CaptureManager", "Error during stopCapture: ${e.localizedMessage}")
         }
